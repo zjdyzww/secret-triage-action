@@ -103,3 +103,25 @@ Because "your scanner reported X" is the least useful sentence in security. Know
 ```bash
 git tag -f v1 && git push -f origin v1
 ```
+
+## 端到端验证：Security 页里到底进了几条（硬证据）
+
+我用一个独立 demo 仓库（`zjdyzww/secret-triage-demo`）跑了整条链：
+
+| 步骤 | 结果 |
+|---|---|
+| 造 3 条输入 | `rules/aws.yml`（规则文件）、`tests/redact.spec.ts`（测试夹具）、`src/leak.js`（真密钥形态） |
+| 分诊 + 输出 SARIF | `SARIF written: triage.sarif results: 1` |
+| `upload-sarif` 上传 | workflow **success** |
+| **Code Scanning 实际告警数** | **1 条**：`secret-triage/real-secret | src/leak.js:1` |
+
+**两条噪声（规则文件、测试夹具）一条都没进 Security 页。**
+这就是"去噪"的可验证含义——不是我说降噪了，是 API 查出来只有 1 条。
+
+> 该告警是**故意造的合成样本**，验证完成后已被我 dismiss（reason: won't fix）。
+> 一个"降噪工具"的 demo 仓库里留一条假告警，本身就说不过去。
+
+复现命令：
+```bash
+gh api repos/zjdyzww/secret-triage-demo/code-scanning/alerts --jq '.[] | "\(.state) | \(.most_recent_instance.location.path)"'
+```
