@@ -49,6 +49,7 @@ runs:
       env:
         REPORT: ${{ inputs.report }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        GH_TOKEN: ${{ github.token }}   # gh CLI 在 Actions 里必须显式给 token
         ROOT: ${{ inputs.repo-root }}
         OUT: ${{ inputs.output }}
       run: |
