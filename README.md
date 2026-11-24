@@ -147,3 +147,35 @@ git tag -f v1 && git push -f origin v1
 ```bash
 gh api repos/zjdyzww/secret-triage-demo/code-scanning/alerts --jq '.[] | "\(.state) | \(.most_recent_instance.location.path)"'
 ```
+
+## PR 里直接给结论（sticky 评论，幂等）
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write      # 评论必需
+steps:
+  - uses: zjdyzww/secret-triage-action@v1
+    with:
+      report: gitleaks.json
+      pr-comment: 'true'
+      fail-on-real: 'false'
+```
+
+在 PR 上留一条**可折叠**的评论：
+
+| metric | value |
+|---|---|
+| real findings | **1** |
+| excluded by context | 2 |
+
+重复跑**只更新同一条**（`<!-- secret-triage -->` 标记做幂等），不会刷屏。
+
+**实测**（`zjdyzww/secret-triage-demo` 的 PR #1）：run success，评论出现，带标记的评论数恒为 **1**（第二次运行是更新而非新增）。
+
+### 两个踩过的坑
+
+1. **`gh` CLI 在 Actions 里必须显式给 token**：否则报
+   `gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable`（exit 4）。
+   已在 action 内部用 `GH_TOKEN: ${{ github.token }}` 解决。
+2. **改了 `action.yml` 必须重打 tag**（`git tag -f v1 && git push -f origin v1`），否则 runner 取旧版本。
