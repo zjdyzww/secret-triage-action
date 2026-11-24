@@ -1,0 +1,66 @@
+name: 'Secret Scan Triage'
+description: 'Turn noisy secret-scan alerts into real findings vs noise (tests, rule files, docs, artifacts). Local-only, no network.'
+author: 'zjdyzww'
+branding:
+  icon: 'shield'
+  color: 'purple'
+inputs:
+  report:
+    description: 'Path to your scanner report (gitleaks JSON / SARIF / text with path:line)'
+    required: true
+  repo-root:
+    description: 'Repository root used to resolve paths in the report'
+    required: false
+    default: '.'
+  fail-on-real:
+    description: 'Fail the step when at least one real finding is found (true/false)'
+    required: false
+    default: 'true'
+  output:
+    description: 'Where to write the triage result (markdown)'
+    required: false
+    default: 'secret-triage-report.md'
+outputs:
+  real:
+    description: 'Number of findings judged real'
+    value: ${{ steps.triage.outputs.real }}
+  triaged:
+    description: 'Number of findings excluded by context'
+    value: ${{ steps.triage.outputs.triaged }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout triage tool
+      shell: bash
+      run: |
+        set -euo pipefail
+        git clone --depth 1 https://github.com/zjdyzww/ai-code-health.git "$RUNNER_TEMP/ai-code-health"
+    - name: Run triage
+      id: triage
+      shell: bash
+      env:
+        REPORT: ${{ inputs.report }}
+        ROOT: ${{ inputs.repo-root }}
+        OUT: ${{ inputs.output }}
+      run: |
+        set -euo pipefail
+        node "$RUNNER_TEMP/ai-code-health/review.mjs" "$ROOT" --from-report "$REPORT" > "$OUT" || RC=$?
+        RC=${RC:-0}
+        # 从 JSON 里取计数（--json 输出最稳）
+        node "$RUNNER_TEMP/ai-code-health/review.mjs" "$ROOT" --from-report "$REPORT" --json > /tmp/triage.json || true
+        REAL=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('/tmp/triage.json','utf8')).measures.real)}catch{console.log('0')}")
+        TRIAGED=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('/tmp/triage.json','utf8')).measures.triaged)}catch{console.log('0')}")
+        echo "real=$REAL" >> "$GITHUB_OUTPUT"
+        echo "triaged=$TRIAGED" >> "$GITHUB_OUTPUT"
+        {
+          echo "### Secret scan triage"
+          echo ""
+          echo "- **real findings: ${REAL}**"
+          echo "- excluded by context: ${TRIAGED}"
+          echo ""
+          sed -n '1,40p' "$OUT"
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ "${{ inputs.fail-on-real }}" = "true" ] && [ "$REAL" != "0" ]; then
+          echo "::error::${REAL} real secret finding(s) need rotation (revoke first, then edit code)"
+          exit 1
+        fi

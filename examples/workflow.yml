@@ -1,0 +1,28 @@
+name: secret-triage
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Scan (gitleaks)
+        run: |
+          curl -sSL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --report-format json --report-path gitleaks.json --no-banner || true
+
+      - name: Triage
+        id: triage
+        uses: zjdyzww/secret-triage-action@v1
+        with:
+          report: gitleaks.json
+
+      - name: Comment the result
+        if: always()
+        run: echo "real=${{ steps.triage.outputs.real }} excluded=${{ steps.triage.outputs.triaged }}" >> "$GITHUB_STEP_SUMMARY"
