@@ -20,6 +20,10 @@ inputs:
     description: 'Where to write the triage result (markdown)'
     required: false
     default: 'secret-triage-report.md'
+  sarif-output:
+    description: 'If set, write a SARIF file containing ONLY the real findings (for upload-sarif / code scanning).'
+    required: false
+    default: ''
 outputs:
   real:
     description: 'Number of findings judged real'
@@ -60,6 +64,33 @@ runs:
           echo ""
           sed -n '1,40p' "$OUT"
         } >> "$GITHUB_STEP_SUMMARY"
+        if [ -n "${{ inputs.sarif-output }}" ]; then
+          SARIF="${{ inputs.sarif-output }}" node -e '
+            const fs = require("fs");
+            const t = JSON.parse(fs.readFileSync("/tmp/triage.json", "utf8"));
+            const results = (t.real || []).map((label) => {
+              const m = String(label).match(/^(.*?):(\d+)/);
+              const file = m ? m[1] : String(label);
+              const line = m ? Number(m[2]) : 1;
+              return {
+                ruleId: "secret-triage/real-secret",
+                level: "error",
+                message: { text: "Real secret finding (excluded noise not shown): " + label },
+                locations: [{ physicalLocation: { artifactLocation: { uri: file }, region: { startLine: line } } }],
+              };
+            });
+            const sarif = {
+              $schema: "https://json.schemastore.org/sarif-2.1.0.json",
+              version: "2.1.0",
+              runs: [{
+                tool: { driver: { name: "secret-triage", informationUri: "https://github.com/zjdyzww/secret-triage-action", rules: [{ id: "secret-triage/real-secret", shortDescription: { text: "Real secret finding" } }] } },
+                results,
+              }],
+            };
+            fs.writeFileSync(process.env.SARIF, JSON.stringify(sarif, null, 2));
+            console.log("SARIF written:", process.env.SARIF, "results:", results.length);
+          '
+        fi
         if [ "${{ inputs.fail-on-real }}" = "true" ] && [ "$REAL" != "0" ]; then
           echo "::error::${REAL} real secret finding(s) need rotation (revoke first, then edit code)"
           exit 1
