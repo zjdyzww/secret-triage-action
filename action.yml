@@ -20,6 +20,10 @@ inputs:
     description: 'Where to write the triage result (markdown)'
     required: false
     default: 'secret-triage-report.md'
+  pr-comment:
+    description: 'If true and running on a pull_request event, post/update a sticky comment with the triage summary'
+    required: false
+    default: 'false'
   sarif-output:
     description: 'If set, write a SARIF file containing ONLY the real findings (for upload-sarif / code scanning).'
     required: false
@@ -44,6 +48,7 @@ runs:
       shell: bash
       env:
         REPORT: ${{ inputs.report }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
         ROOT: ${{ inputs.repo-root }}
         OUT: ${{ inputs.output }}
       run: |
@@ -90,6 +95,42 @@ runs:
             fs.writeFileSync(process.env.SARIF, JSON.stringify(sarif, null, 2));
             console.log("SARIF written:", process.env.SARIF, "results:", results.length);
           '
+        fi
+        if [ "${{ inputs.pr-comment }}" = "true" ] && [ -n "${PR_NUMBER:-}" ]; then
+          MARKER='<!-- secret-triage -->'
+          BODY_FILE=$(mktemp)
+          {
+            echo "$MARKER"
+            echo "### Secret scan triage"
+            echo ""
+            echo "| metric | value |"
+            echo "|---|---|"
+            echo "| real findings | **${REAL}** |"
+            echo "| excluded by context | ${TRIAGED} |"
+            echo ""
+            if [ "$REAL" != "0" ]; then
+              echo "**Action needed:** rotate the credential(s) below FIRST, then fix the code."
+              echo ""
+            fi
+            echo "<details><summary>Full triage</summary>"
+            echo ""
+            echo '```'
+            sed -n '1,60p' "$OUT"
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "_6 buckets: test fixture · scanner rule file · doc/template · build artifact · detector source · knowledge snapshot_"
+          } > "$BODY_FILE"
+          EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1 || true)
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING}" -F body=@"$BODY_FILE" >/dev/null
+            echo "updated PR comment ${EXISTING}"
+          else
+            gh pr comment "$PR_NUMBER" --body-file "$BODY_FILE" >/dev/null
+            echo "created PR comment on #${PR_NUMBER}"
+          fi
         fi
         if [ "${{ inputs.fail-on-real }}" = "true" ] && [ "$REAL" != "0" ]; then
           echo "::error::${REAL} real secret finding(s) need rotation (revoke first, then edit code)"
