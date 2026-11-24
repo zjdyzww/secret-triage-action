@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="300" viewBox="0 0 820 300" font-family="-apple-system, Segoe UI, Roboto, sans-serif">
+  <rect width="820" height="300" fill="#ffffff"/>
+  <text x="24" y="34" font-size="18" font-weight="600" fill="#111">Same 3 findings, two different Security tabs</text>
+
+  <!-- LEFT: raw scanner -->
+  <text x="24" y="70" font-size="14" font-weight="600" fill="#b42318">BEFORE · raw scanner → code scanning</text>
+  <rect x="24" y="82" width="360" height="34" rx="6" fill="#fef3f2" stroke="#fda29b"/>
+  <text x="36" y="104" font-size="13" fill="#7a271a">⚠ rules/aws.yml:16  (scanner's own rule file)</text>
+  <rect x="24" y="124" width="360" height="34" rx="6" fill="#fef3f2" stroke="#fda29b"/>
+  <text x="36" y="146" font-size="13" fill="#7a271a">⚠ tests/redact.spec.ts:44  (test fixture)</text>
+  <rect x="24" y="166" width="360" height="34" rx="6" fill="#fef3f2" stroke="#fda29b"/>
+  <text x="36" y="188" font-size="13" fill="#7a271a">⚠ src/leak.js:2  (real)</text>
+  <text x="24" y="228" font-size="13" fill="#667085">3 alerts open → 2 of them are noise</text>
+  <text x="24" y="250" font-size="13" fill="#667085">after a while: people stop reading</text>
+
+  <!-- arrow -->
+  <path d="M404 145 L444 145" stroke="#475467" stroke-width="2" marker-end="url(#a)"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#475467"/></marker></defs>
+  <text x="400" y="132" font-size="12" fill="#475467">triage</text>
+
+  <!-- RIGHT: after triage -->
+  <text x="458" y="70" font-size="14" font-weight="600" fill="#027a48">AFTER · secret-triage → code scanning</text>
+  <rect x="458" y="82" width="338" height="34" rx="6" fill="#f2f4f7" stroke="#d0d5dd"/>
+  <text x="470" y="104" font-size="13" fill="#475467">✓ rules/aws.yml — excluded (rule file)</text>
+  <rect x="458" y="124" width="338" height="34" rx="6" fill="#f2f4f7" stroke="#d0d5dd"/>
+  <text x="470" y="146" font-size="13" fill="#475467">✓ tests/redact.spec.ts — excluded (fixture)</text>
+  <rect x="458" y="166" width="338" height="34" rx="6" fill="#ecfdf3" stroke="#12b76a"/>
+  <text x="470" y="188" font-size="13" fill="#054f31">⚠ src/leak.js:2 — real, needs rotation</text>
+  <text x="458" y="228" font-size="13" fill="#027a48">1 alert open → it is the one that matters</text>
+  <text x="458" y="250" font-size="13" fill="#027a48">verified via GitHub API, not by claim</text>
+</svg>

@@ -1,6 +1,28 @@
 # Secret Scan Triage · GitHub Action
 
-> Your scanner reports 28 "leaks". This action tells you **which ones are real** — and fails the build only when something actually needs rotating.
+![before/after](assets-before-after.svg)
+
+**Your scanner reports 3 leaks. Only 1 is real. This action puts only the real one in your Security tab — and fails the build only when something actually needs rotating.**
+
+## 5-line setup
+
+```yaml
+- run: gitleaks detect --report-format json --report-path gitleaks.json || true
+- uses: zjdyzww/secret-triage-action@v1
+  with:
+    report: gitleaks.json
+    sarif-output: triage.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with: { sarif_file: triage.sarif }
+```
+(needs `permissions: security-events: write` for the upload step)
+
+Verified on a real runner: **3 input findings → 1 alert in code scanning**, the two noise items never reached the Security tab. Check it yourself:
+```bash
+gh api repos/zjdyzww/secret-triage-demo/code-scanning/alerts --jq '.[] | "\(.state) | \(.most_recent_instance.location.path)"'
+```
+
+---
 
 ```yaml
 - name: Generate scanner report
