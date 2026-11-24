@@ -71,3 +71,35 @@ Because "your scanner reported X" is the least useful sentence in security. Know
 `src/leak.js`（真密钥形态→保留）。断言 hard-coded 为 `real=1 triaged=2`，**不达标就红**。
 
 证据链接：`https://github.com/zjdyzww/ai-code-health/actions/workflows/self-test-action.yml`
+
+## SARIF 输出：把噪音从 GitHub 代码扫描里摘掉
+
+这是这个 Action 最实用的形态——**只把"真发现"喂给 GitHub Code Scanning**：
+
+```yaml
+- name: Triage
+  id: triage
+  uses: zjdyzww/secret-triage-action@v1
+  with:
+    report: gitleaks.json
+    sarif-output: triage.sarif      # 只包含 real 的条目
+    fail-on-real: 'false'           # 让 code scanning 决定红不红
+
+- name: Upload to code scanning
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: triage.sarif
+```
+
+**效果**：你的 Security 标签页里只剩下真需要轮换的东西，测试夹具/规则文件/文档模板不再刷屏。
+
+**已验证**（本仓库真 runner）：`SARIF written: triage.sarif results: 1`，且断言"1 条结果 + `rules/aws.yml` 与 `tests/` 不得出现在 SARIF 里"通过。
+
+## 常见坑（我踩过）
+
+**改了 `action.yml` 一定要重新打 tag**：`@v1` 指向的是 tag，不是分支。我第一次改完只 commit 没 `git tag -f v1`，
+自测直接红 —— 因为 runner 取到的还是旧版本。修法：
+
+```bash
+git tag -f v1 && git push -f origin v1
+```
